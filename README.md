@@ -20,6 +20,14 @@ If you have packaged this for another disto, please open an issue or PR so the i
 
 * Install the `bluetooth-autoconnect` script to somewhere in your `PATH`, such as `/usr/local/bin/`
 * If you are using systemd, consider installing the `bluetooth-autoconnect.service` file to `/etc/systemd/system/` and modifying it to reflect the location of where you installed the script
+  - Enable the service with `systemctl enable bluetooth-autoconnect`
+
+#### pulseaudio
+
+If you are using a bluetooth headset with pulseaudio running as your user, then the above service will fail to connect to your headset on boot because pulseaudio won't have been started when to bluetooth service comes up.
+
+* If you are using systemd, consider installing the `pulseaudio-bluetooth-autoconnect.service` file to `/etc/systemd/user/` or `~/.config/systemd/user/` and modifying it to reflect the location of where you installed the script
+  - Enable the service with `systemctl --user enable pulseaudio-bluetooth-autoconnect`
 
 ## Usage
 

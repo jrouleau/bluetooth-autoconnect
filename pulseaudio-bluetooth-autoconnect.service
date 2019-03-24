@@ -1,0 +1,10 @@
+[Unit]
+Description=Bluetooth autoconnect service for pulseaudio
+After=pulseaudio.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bluetooth-autoconnect
+
+[Install]
+WantedBy=pulseaudio.service
