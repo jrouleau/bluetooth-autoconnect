@@ -179,13 +179,15 @@ def main():
 
     if daemon:
         # Listen for changes on the BlueZ dbus interface
-        # Unfourtunately this is a catch all listener because as of
-        # BlueZ v5.50 there is no easier way to get notified of new adapters
+        # This is a catch all listener (no path specified) because we
+        # want to get notified for all adapters without keeping a list
+        # of them and managing signal handlers independantly
         bus.add_signal_receiver(
                 properties_changed_handler,
                 signal_name='PropertiesChanged',
                 dbus_interface='org.freedesktop.DBus.Properties',
                 bus_name='org.bluez',
+                path=None,
                 path_keyword='path')
 
         # Attempt to connect to devices on all existing adapters
