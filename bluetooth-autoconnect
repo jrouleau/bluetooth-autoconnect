@@ -244,4 +244,4 @@ if __name__ == '__main__':
     main()
 
 
-# vim: ts=8 et sw=4 sts=4
+# vim: syn=python ts=8 et sw=4 sts=4
