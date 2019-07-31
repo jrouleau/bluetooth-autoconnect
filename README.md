@@ -15,12 +15,16 @@ If you have packaged this for another disto, please open an issue or PR so the i
 ### Arch Linux
 
 * Install AUR package from https://aur.archlinux.org/packages/bluetooth-autoconnect/
+* Enable the service with `sudo systemctl enable bluetooth-autoconnect`
 
-### Manual install
+#### pulseaudio
+* If you are using pulseaudio with a bluetooth headset or speaker, also enable the helper service with `systemctl --user enable pulseaudio-bluetooth-autoconnect`
+
+### Manual
 
 * Install the `bluetooth-autoconnect` script to somewhere in your `PATH`, such as `/usr/local/bin/`
 * If you are using systemd, consider installing the `bluetooth-autoconnect.service` file to `/etc/systemd/system/` and modifying it to reflect the location of where you installed the script
-  - Enable the service with `systemctl enable bluetooth-autoconnect`
+  - Enable the service with `sudo systemctl enable bluetooth-autoconnect`
 
 #### pulseaudio
 
