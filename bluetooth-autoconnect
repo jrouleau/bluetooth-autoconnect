@@ -182,7 +182,8 @@ def main():
     # correctly
     try:
         import prctl
-        print(f'setting process name to \'{SCRIPT_NAME}\'')
+        if verbose:
+            print(f'setting process name to \'{SCRIPT_NAME}\'')
         prctl.set_name(SCRIPT_NAME)
         prctl.set_proctitle(' '.join(sys.argv))
     except ImportError:
