@@ -177,6 +177,19 @@ def main():
         print(f"Try '{SCRIPT_NAME} --help' for more information", file=sys.stderr)
         sys.exit(1)
 
+    # Set process name and title
+    # This allows commands like `killall SCRIPT_NAME` to function
+    # correctly
+    try:
+        import prctl
+        print(f'setting process name to \'{SCRIPT_NAME}\'')
+        prctl.set_name(SCRIPT_NAME)
+        prctl.set_proctitle(' '.join(sys.argv))
+    except ImportError:
+        if verbose:
+            print(f'failed to load module \'prctl\'')
+            print(f'process name not set')
+
     if daemon:
         # Listen for changes on the BlueZ dbus interface
         # This is a catch all listener (no path specified) because we

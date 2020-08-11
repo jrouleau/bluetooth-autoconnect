@@ -6,7 +6,7 @@ It can operate as a oneshot script or as a daemon where it waits for adapters to
 
 ## Requirements
 
-* Requires `python3`, `python-dbus`, and `bluez`
+* Requires `python3`, `python-prctl`, `python-dbus`, and `bluez`
 
 ## Installation
 
