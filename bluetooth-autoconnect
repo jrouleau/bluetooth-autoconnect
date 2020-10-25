@@ -5,11 +5,8 @@ import os
 import signal
 import sys
 
-import dbus
-
-from dbus.mainloop.glib import DBusGMainLoop
 from functools import partial
-from gi.repository import GLib
+from gi.repository import Gio, GLib
 from xml.etree import ElementTree
 
 
@@ -18,8 +15,20 @@ SCRIPT_NAME = os.path.basename(sys.argv[0])
 
 def dbus_get_child_object_paths(object_path):
     object_paths = []
-    obj = bus.get_object('org.bluez', object_path, introspect=False)
-    xml_string = obj.Introspect(dbus_interface='org.freedesktop.DBus.Introspectable')
+    obj = Gio.DBusProxy.new_sync(
+        bus,
+        Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES,
+        None,
+        'org.bluez',
+        object_path,
+        "org.freedesktop.DBus.Introspectable"
+    )
+    (xml_string,) = obj.call_sync(
+        'Introspect',
+        None,
+        Gio.DBusCallFlags.NONE,
+        GLib.MAXINT
+    ).unpack()
 
     if object_path == '/':
         object_path = ''
@@ -52,23 +61,39 @@ def connect_devices_for_adapter(adapter_path):
                 loop.quit()
 
     # Handle the async replies for a connection attempt
-    def reply_handler(device_path):
-        print(f'successfully connected to device {device_path}')
+    def reply_handler(source_object, res, *user_data):
+        device_path = source_object.get_object_path()
+        try:
+            source_object.call_finish(res)
+        except GLib.Error as e:
+            print_device_error(device_path, e)
+        else:
+            print(f'successfully connected to device {device_path}')
+
         remove_pending_connection(device_path)
 
-    def error_handler(device_path, e):
-        print(f'error connecting to device {device_path}: {e.get_dbus_message()}', file=sys.stderr)
-        remove_pending_connection(device_path)
+    def print_device_error(device_path, e):
+        print(f'error connecting to device {device_path}: [{e.domain}]: {e.message}', file=sys.stderr)
 
     for device_path in device_paths:
         if verbose:
             print(f'found device {device_path}')
         try:
             # Read the device's properties
-            obj = bus.get_object('org.bluez', device_path)
-            props = obj.GetAll(
-                    'org.bluez.Device1',
-                    dbus_interface='org.freedesktop.DBus.Properties')
+            obj = Gio.DBusProxy.new_sync(
+                bus,
+                Gio.DBusProxyFlags.NONE,
+                None,
+                'org.bluez',
+                device_path,
+                'org.freedesktop.DBus.Properties'
+            )
+            (props,) = obj.call_sync(
+                'GetAll',
+                GLib.Variant.new_tuple(GLib.Variant.new_string("org.bluez.Device1")),
+                Gio.DBusCallFlags.NONE,
+                GLib.MAXINT
+            ).unpack()
 
             if props.get('Connected', False):
                 if verbose:
@@ -81,13 +106,16 @@ def connect_devices_for_adapter(adapter_path):
                 add_pending_connection(device_path)
 
                 # Attempt to connect to the device
-                obj.Connect(
-                        dbus_interface='org.bluez.Device1',
-                        reply_handler=partial(reply_handler, device_path),
-                        error_handler=partial(error_handler, device_path))
-        except dbus.exceptions.DBusException as e:
-            error_handler(device_path, e)
-
+                obj.call(
+                    'org.bluez.Device1.Connect',
+                    None,
+                    Gio.DBusCallFlags.NONE,
+                    GLib.MAXINT,
+                    None,
+                    reply_handler
+                )
+        except GLib.error as e:
+            print_device_error(device_path, e)
 
 def connect_devices_for_all_adapters():
     if verbose:
@@ -101,10 +129,20 @@ def connect_devices_for_all_adapters():
             print(f'found adapter {adapter_path}')
         try:
             # Read the adapter's properties
-            obj = bus.get_object('org.bluez', adapter_path)
-            props = obj.GetAll(
-                    'org.bluez.Adapter1',
-                    dbus_interface='org.freedesktop.DBus.Properties')
+            obj = Gio.DBusProxy.new_sync(
+                bus,
+                Gio.DBusProxyFlags.NONE,
+                None,
+                'org.bluez',
+                adapter_path,
+                'org.freedesktop.DBus.Properties'
+            )
+            (props,) = obj.call_sync(
+                'GetAll',
+                GLib.Variant.new_tuple(GLib.Variant.new_string("org.bluez.Adapter1")),
+                Gio.DBusCallFlags.NONE,
+                GLib.MAXINT
+            ).unpack()
 
             # We're only interested in adapters that are powered on
             if props.get('Powered', False):
@@ -113,18 +151,19 @@ def connect_devices_for_all_adapters():
 
                 # Try to connect to devices on this adapter
                 connect_devices_for_adapter(adapter_path)
-        except dbus.exceptions.DBusException as e:
-            print(f'error reading properties for adapter {adapter_path}: {e.get_dbus_message()}', file=sys.stderr)
+        except GLib.Error as e:
+            print(f'error reading properties for adapter {adapter_path}: [{e.domain}]: {e.message}', file=sys.stderr)
 
 
-def properties_changed_handler(interface_name, changed_properties, invalidated_properties, path):
+def properties_changed_handler(connection, sender_name, object_path, interface_name, signal_name, parameters, *user_data):
     # We're only interested in adapters that have been powered on
+    (interface_name, changed_properties, invalidated_properties) = parameters
     if interface_name == 'org.bluez.Adapter1' and changed_properties.get('Powered', False):
         if verbose:
-            print(f'adapter {path} has powered on')
+            print(f'adapter {object_path} has powered on')
 
         # Try to connect to devices on this adapter
-        connect_devices_for_adapter(path)
+        connect_devices_for_adapter(object_path)
 
 
 def usage():
@@ -196,13 +235,15 @@ def main():
         # This is a catch all listener (no path specified) because we
         # want to get notified for all adapters without keeping a list
         # of them and managing signal handlers independantly
-        bus.add_signal_receiver(
-                properties_changed_handler,
-                signal_name='PropertiesChanged',
-                dbus_interface='org.freedesktop.DBus.Properties',
-                bus_name='org.bluez',
-                path=None,
-                path_keyword='path')
+        bus.signal_subscribe(
+            'org.bluez',
+            None,
+            'PropertiesChanged',
+            None,
+            None,
+            Gio.DBusSignalFlags.NONE,
+            properties_changed_handler
+        )
 
         # Attempt to connect to devices on all existing adapters
         connect_devices_for_all_adapters()
@@ -246,8 +287,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Connect to the system dbus
-    DBusGMainLoop(set_as_default=True)
-    bus = dbus.SystemBus()
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM)
 
     # Initialize globals
     daemon = False
