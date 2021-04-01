@@ -1,4 +1,4 @@
-#!/usr/bin/env -S python3 -u
+#!/usr/bin/env python3
 
 import getopt
 import os
@@ -33,7 +33,7 @@ def dbus_get_child_object_paths(object_path):
 
 def connect_devices_for_adapter(adapter_path):
     if verbose:
-        print(f'scanning for devices on {adapter_path}')
+        print(f'scanning for devices on {adapter_path}', flush=True)
 
     # Get list of devices
     device_paths = dbus_get_child_object_paths(adapter_path)
@@ -53,16 +53,16 @@ def connect_devices_for_adapter(adapter_path):
 
     # Handle the async replies for a connection attempt
     def reply_handler(device_path):
-        print(f'successfully connected to device {device_path}')
+        print(f'successfully connected to device {device_path}', flush=True)
         remove_pending_connection(device_path)
 
     def error_handler(device_path, e):
-        print(f'error connecting to device {device_path}: {e.get_dbus_message()}', file=sys.stderr)
+        print(f'error connecting to device {device_path}: {e.get_dbus_message()}', file=sys.stderr, flush=True)
         remove_pending_connection(device_path)
 
     for device_path in device_paths:
         if verbose:
-            print(f'found device {device_path}')
+            print(f'found device {device_path}', flush=True)
         try:
             # Read the device's properties
             obj = bus.get_object('org.bluez', device_path)
@@ -72,12 +72,12 @@ def connect_devices_for_adapter(adapter_path):
 
             if props.get('Connected', False):
                 if verbose:
-                    print(f'device {device_path} is already connected')
+                    print(f'device {device_path} is already connected', flush=True)
             elif not props.get('Trusted', False):
                 if verbose:
-                    print(f'device {device_path} is not trusted')
+                    print(f'device {device_path} is not trusted', flush=True)
             else:
-                print(f'connecting to device {device_path}')
+                print(f'connecting to device {device_path}', flush=True)
                 add_pending_connection(device_path)
 
                 # Attempt to connect to the device
@@ -91,14 +91,14 @@ def connect_devices_for_adapter(adapter_path):
 
 def connect_devices_for_all_adapters():
     if verbose:
-        print('scanning for adapters...')
+        print('scanning for adapters...', flush=True)
 
     # Get a list of adapters
     adapter_paths = dbus_get_child_object_paths('/org/bluez')
 
     for adapter_path in adapter_paths:
         if verbose:
-            print(f'found adapter {adapter_path}')
+            print(f'found adapter {adapter_path}', flush=True)
         try:
             # Read the adapter's properties
             obj = bus.get_object('org.bluez', adapter_path)
@@ -109,19 +109,19 @@ def connect_devices_for_all_adapters():
             # We're only interested in adapters that are powered on
             if props.get('Powered', False):
                 if verbose:
-                    print(f'adapter {adapter_path} is powered on')
+                    print(f'adapter {adapter_path} is powered on', flush=True)
 
                 # Try to connect to devices on this adapter
                 connect_devices_for_adapter(adapter_path)
         except dbus.exceptions.DBusException as e:
-            print(f'error reading properties for adapter {adapter_path}: {e.get_dbus_message()}', file=sys.stderr)
+            print(f'error reading properties for adapter {adapter_path}: {e.get_dbus_message()}', file=sys.stderr, flush=True)
 
 
 def properties_changed_handler(interface_name, changed_properties, invalidated_properties, path):
     # We're only interested in adapters that have been powered on
     if interface_name == 'org.bluez.Adapter1' and changed_properties.get('Powered', False):
         if verbose:
-            print(f'adapter {path} has powered on')
+            print(f'adapter {path} has powered on', flush=True)
 
         # Try to connect to devices on this adapter
         connect_devices_for_adapter(path)
@@ -139,7 +139,7 @@ def usage():
         f'  -h, --help        Print this help message',
         f'  -v, --verbose     Show more detailed log messages',
         f'',
-    ]))
+    ]), flush=True)
     sys.exit(0)
 
 
@@ -151,8 +151,8 @@ def main():
     try:
         opts, cmds = getopt.getopt(sys.argv[1:], 'dhv', ['daemon', 'help', 'verbose'])
     except getopt.GetoptError as e:
-        print(f'{SCRIPT_NAME}:', e, file=sys.stderr)
-        print(f"Try '{SCRIPT_NAME} --help' for more information", file=sys.stderr)
+        print(f'{SCRIPT_NAME}:', e, file=sys.stderr, flush=True)
+        print(f"Try '{SCRIPT_NAME} --help' for more information", file=sys.stderr, flush=True)
         sys.exit(1)
 
     # Process options (e.g. -h, --verbose)
@@ -166,15 +166,15 @@ def main():
         else:
             # This shouldn't ever happen unless we forget to handle an
             # option we've added
-            print(f'{SCRIPT_NAME}: internal error: unhandled option {o}', file=sys.stderr)
+            print(f'{SCRIPT_NAME}: internal error: unhandled option {o}', file=sys.stderr, flush=True)
             sys.exit(1)
 
     # Process commands
     # This script does not use any commands so we will exit if one is
     # incorrectly provided
     if len(cmds) > 0:
-        print(f"{SCRIPT_NAME}: command '{c}' not recognized", file=sys.stderr)
-        print(f"Try '{SCRIPT_NAME} --help' for more information", file=sys.stderr)
+        print(f"{SCRIPT_NAME}: command '{c}' not recognized", file=sys.stderr, flush=True)
+        print(f"Try '{SCRIPT_NAME} --help' for more information", file=sys.stderr, flush=True)
         sys.exit(1)
 
     # Set process name and title
@@ -183,13 +183,13 @@ def main():
     try:
         import prctl
         if verbose:
-            print(f'setting process name to \'{SCRIPT_NAME}\'')
+            print(f'setting process name to \'{SCRIPT_NAME}\'', flush=True)
         prctl.set_name(SCRIPT_NAME)
         prctl.set_proctitle(' '.join(sys.argv))
     except ImportError:
         if verbose:
-            print(f'failed to load module \'prctl\'')
-            print(f'process name not set')
+            print(f'failed to load module \'prctl\'', flush=True)
+            print(f'process name not set', flush=True)
 
     if daemon:
         # Listen for changes on the BlueZ dbus interface
@@ -232,7 +232,7 @@ def signal_handler(sig, frame):
     else:
         # This shouldn't ever happen unless we forget to handle a signal
         # we've added
-        print(f'internal error: unhandled signal {sig}', file=sys.stderr)
+        print(f'internal error: unhandled signal {sig}', file=sys.stderr, flush=True)
         sys.exit(2)
 
 
